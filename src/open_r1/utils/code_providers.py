@@ -23,20 +23,30 @@ from ..utils import is_e2b_available, is_morph_available
 
 
 if is_e2b_available():
-    from e2b_code_interpreter import AsyncSandbox
-    from e2b_code_interpreter.models import Execution
+    try:
+        from e2b_code_interpreter import AsyncSandbox
+        from e2b_code_interpreter.models import Execution
 
-    from .routed_sandbox import RoutedSandbox
+        from .routed_sandbox import RoutedSandbox
+    except Exception:
+        AsyncSandbox = None
+        Execution = None
+        RoutedSandbox = None
 else:
     AsyncSandbox = None
     Execution = None
     RoutedSandbox = None
 
 if is_morph_available():
-    from morphcloud.api import MorphCloudClient
-    from morphcloud.sandbox import Sandbox
+    try:
+        from morphcloud.api import MorphCloudClient
+        from morphcloud.sandbox import Sandbox
 
-    from .routed_morph import RoutedMorphSandbox
+        from .routed_morph import RoutedMorphSandbox
+    except Exception:
+        MorphCloudClient = None
+        Sandbox = None
+        RoutedMorphSandbox = None
 else:
     MorphCloudClient = None
     Sandbox = None
@@ -70,7 +80,7 @@ class E2BProvider(CodeExecutionProvider):
             num_parallel: Number of parallel sandboxes to use
             e2b_router_url: URL for the E2B router (if using router mode)
         """
-        if not is_e2b_available():
+        if not is_e2b_available() or AsyncSandbox is None:
             raise ImportError(
                 "E2B is not available and required for this provider. Please install E2B with "
                 "`pip install e2b-code-interpreter` and add an API key to a `.env` file."
@@ -176,7 +186,7 @@ class MorphProvider(CodeExecutionProvider):
             num_parallel: Number of parallel executions to use
             morph_router_url: URL for the MorphCloud router (if using router mode)
         """
-        if not is_morph_available():
+        if not is_morph_available() or MorphCloudClient is None or Sandbox is None:
             raise ImportError(
                 "MorphCloud is not available and required for this provider. Please install MorphCloud with "
                 "`pip install morphcloud` and add an API key to a `.env` file."

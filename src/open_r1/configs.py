@@ -329,3 +329,88 @@ class GRPOScriptArguments(ScriptArguments):
         default=4096,
         metadata={"help": "Minimum number of characters in completion."},
     )
+    method: Literal["vanilla", "mgrpo", "seed"] = field(
+        default="vanilla",
+        metadata={
+            "help": "GRPO variant selector.",
+            "choices": ["vanilla", "mgrpo", "seed"],
+        },
+    )
+    mgrpo_num_layer2_generations: int = field(
+        default=4,
+        metadata={
+            "help": "Number of layer-2 corrective generations per sample for MGRPO."
+        },
+    )
+    mgrpo_guiding_phrases: Optional[list[str]] = field(
+        default_factory=lambda: [
+            "Re-check the final answer carefully and correct any mistakes.",
+            "Try another reasoning path and compare with your first result.",
+            "Verify arithmetic and symbolic steps before giving the final answer.",
+        ],
+        metadata={
+            "help": "Guiding phrases used to build layer-2 prompts in MGRPO mode."
+        },
+    )
+    seed_entropy_modulation: Literal["linear", "exp", "focal"] = field(
+        default="linear",
+        metadata={
+            "help": "Semantic-entropy modulation function used in SEED mode.",
+            "choices": ["linear", "exp", "focal"],
+        },
+    )
+    seed_alpha: float = field(
+        default=1.0,
+        metadata={"help": "Sensitivity coefficient for SEED entropy modulation."},
+    )
+    seed_entropy_normalize: bool = field(
+        default=True,
+        metadata={
+            "help": "Normalize semantic entropy by log(K) where K is the number of unique clusters."
+        },
+    )
+    runtime_profile: Literal["default", "local-dryrun", "h100-prod"] = field(
+        default="default",
+        metadata={
+            "help": "Runtime profile for training/evaluation behavior.",
+            "choices": ["default", "local-dryrun", "h100-prod"],
+        },
+    )
+    dry_run: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable dry-run behavior for local validation without full training/inference.",
+        },
+    )
+    dry_run_skip_train: bool = field(
+        default=True,
+        metadata={
+            "help": "If true, initialize all components but skip trainer.train() in dry-run mode.",
+        },
+    )
+    dry_run_max_samples: int = field(
+        default=64,
+        metadata={
+            "help": "Maximum samples per split to load in dry-run mode.",
+        },
+    )
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        if self.mgrpo_num_layer2_generations < 1:
+            raise ValueError("`mgrpo_num_layer2_generations` must be >= 1")
+
+        if self.seed_alpha <= 0:
+            raise ValueError("`seed_alpha` must be > 0")
+
+        if self.method == "mgrpo" and not self.mgrpo_guiding_phrases:
+            raise ValueError(
+                "`mgrpo_guiding_phrases` must contain at least one phrase in MGRPO mode"
+            )
+
+        if self.runtime_profile == "local-dryrun":
+            self.dry_run = True
+
+        if self.dry_run_max_samples < 1:
+            raise ValueError("`dry_run_max_samples` must be >= 1")

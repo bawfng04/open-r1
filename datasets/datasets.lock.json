@@ -1,0 +1,54 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-04-17T00:00:00Z",
+  "locked_datasets": {
+    "math_500": {
+      "source": "lighteval",
+      "splits": {
+        "test": {
+          "row_count": 500,
+          "sha256": null,
+          "local_path": null
+        }
+      }
+    },
+    "gsm8k": {
+      "source": "huggingface",
+      "dataset_id": "openai/gsm8k",
+      "config": "main",
+      "splits": {
+        "train": {
+          "row_count": 7473,
+          "sha256": null,
+          "local_path": "data/datasets/gsm8k/train.parquet"
+        },
+        "test": {
+          "row_count": 1319,
+          "sha256": null,
+          "local_path": "data/datasets/gsm8k/test.parquet"
+        }
+      }
+    },
+    "aime24": {
+      "source": "lighteval",
+      "splits": {
+        "test": {
+          "row_count": 30,
+          "sha256": null,
+          "local_path": null
+        }
+      }
+    },
+    "amc23": {
+      "source": "huggingface",
+      "dataset_id": "TianHongZXY/amc23",
+      "splits": {
+        "test": {
+          "row_count": 25,
+          "sha256": null,
+          "local_path": "data/datasets/amc23/test.parquet"
+        }
+      }
+    }
+  }
+}

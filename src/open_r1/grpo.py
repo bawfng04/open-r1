@@ -15,6 +15,9 @@
 import logging
 import os
 import sys
+import json
+from pathlib import Path
+from typing import Any
 
 import datasets
 import transformers
@@ -22,6 +25,12 @@ from transformers import set_seed
 from transformers.trainer_utils import get_last_checkpoint
 
 from open_r1.configs import GRPOConfig, GRPOScriptArguments
+from open_r1.methods import (
+    build_mgrpo_layer2_prompt,
+    compute_mgrpo_transition_metrics,
+    compute_semantic_entropy,
+    modulation_factor,
+)
 from open_r1.rewards import get_reward_funcs
 from open_r1.utils import get_dataset, get_model, get_tokenizer
 from open_r1.utils.callbacks import get_callbacks
@@ -30,6 +39,189 @@ from trl import GRPOTrainer, ModelConfig, TrlParser, get_peft_config
 
 
 logger = logging.getLogger(__name__)
+
+CPU_UNSAFE_REWARD_FUNCS = {"code", "binary_code", "ioi_code", "cf_code"}
+
+
+def is_local_dry_run(script_args: GRPOScriptArguments) -> bool:
+    return script_args.dry_run or script_args.runtime_profile == "local-dryrun"
+
+
+def apply_runtime_profile_overrides(
+    script_args: GRPOScriptArguments, training_args: GRPOConfig, model_args: ModelConfig
+):
+    if not is_local_dry_run(script_args):
+        return
+
+    unsafe_reward_funcs = sorted(
+        set(script_args.reward_funcs) & CPU_UNSAFE_REWARD_FUNCS
+    )
+    if unsafe_reward_funcs:
+        raise ValueError(
+            "Dry-run profile cannot use reward functions that require external code execution: "
+            f"{unsafe_reward_funcs}"
+        )
+
+    logger.info("Applying local dry-run runtime overrides.")
+    if hasattr(training_args, "use_vllm"):
+        training_args.use_vllm = False
+    training_args.do_eval = False
+    training_args.push_to_hub = False
+    training_args.report_to = []
+    if hasattr(training_args, "bf16"):
+        training_args.bf16 = False
+    if hasattr(training_args, "fp16"):
+        training_args.fp16 = False
+
+    if not script_args.dry_run_skip_train and training_args.max_steps < 1:
+        training_args.max_steps = 1
+
+    if hasattr(training_args, "num_generations") and training_args.num_generations < 2:
+        training_args.num_generations = 2
+
+    if model_args.attn_implementation == "flash_attention_2":
+        model_args.attn_implementation = "eager"
+
+    if model_args.torch_dtype in {"bfloat16", "float16"}:
+        model_args.torch_dtype = "float32"
+
+
+def limit_dataset_for_dry_run(dataset, script_args: GRPOScriptArguments):
+    if not is_local_dry_run(script_args):
+        return dataset
+
+    max_samples = script_args.dry_run_max_samples
+    target_splits = [script_args.dataset_train_split, script_args.dataset_test_split]
+
+    for split_name in target_splits:
+        if split_name in dataset:
+            sample_count = min(max_samples, len(dataset[split_name]))
+            dataset[split_name] = dataset[split_name].select(range(sample_count))
+            logger.info(
+                f"Dry-run limited split '{split_name}' to {sample_count} samples"
+            )
+
+    return dataset
+
+
+def write_dry_run_summary(
+    script_args: GRPOScriptArguments,
+    training_args: GRPOConfig,
+    dataset,
+    method_diagnostics: dict[str, Any],
+):
+    output_dir = Path(training_args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    summary = {
+        "runtime_profile": script_args.runtime_profile,
+        "method": script_args.method,
+        "dry_run": True,
+        "dry_run_skip_train": script_args.dry_run_skip_train,
+        "train_split": script_args.dataset_train_split,
+        "train_samples": len(dataset[script_args.dataset_train_split]),
+        "reward_funcs": script_args.reward_funcs,
+        "method_diagnostics": method_diagnostics,
+        "hub_model_id": getattr(training_args, "hub_model_id", None),
+        "output_dir": training_args.output_dir,
+    }
+
+    summary_path = output_dir / "dry_run_summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    logger.info(f"Wrote dry-run summary to {summary_path}")
+
+
+def apply_method_features(dataset, script_args: GRPOScriptArguments):
+    """Attach method-specific helper fields to the dataset for dry-run and logging."""
+    method_name = script_args.method
+    diagnostics: dict[str, Any] = {"method": method_name}
+
+    if method_name == "vanilla":
+        return dataset, diagnostics
+
+    for split_name in dataset.keys():
+        split_dataset = dataset[split_name]
+
+        if method_name == "mgrpo":
+            guiding_phrases = script_args.mgrpo_guiding_phrases or [
+                "Re-check the final answer carefully and correct any mistakes.",
+            ]
+
+            def _add_mgrpo_fields(example, idx):
+                prompt_value = str(example.get(script_args.dataset_prompt_column, ""))
+                phrase = guiding_phrases[idx % len(guiding_phrases)]
+                return {
+                    "mgrpo_guiding_phrase": phrase,
+                    "mgrpo_layer2_prompt": build_mgrpo_layer2_prompt(
+                        prompt_value,
+                        "Initial answer unavailable during preprocessing.",
+                        phrase,
+                    ),
+                }
+
+            split_dataset = split_dataset.map(_add_mgrpo_fields, with_indices=True)
+            diagnostics[f"{split_name}_guiding_phrase_count"] = len(guiding_phrases)
+            diagnostics[f"{split_name}_layer2_prompt_count"] = len(split_dataset)
+
+            # If correction labels are present in data, compute transition metrics.
+            if (
+                "mgrpo_turn1_correct" in split_dataset.column_names
+                and "mgrpo_turn2_correct" in split_dataset.column_names
+            ):
+                turn1 = [bool(v) for v in split_dataset["mgrpo_turn1_correct"]]
+                turn2 = [bool(v) for v in split_dataset["mgrpo_turn2_correct"]]
+                metrics = compute_mgrpo_transition_metrics(turn1, turn2)
+                for key, value in metrics.items():
+                    diagnostics[f"{split_name}_{key}"] = value
+
+            dataset[split_name] = split_dataset
+            continue
+
+        if method_name == "seed":
+
+            def _add_seed_fields(example):
+                candidates = example.get("seed_candidate_completions", None)
+                if isinstance(candidates, list) and candidates:
+                    candidate_values = [str(v) for v in candidates]
+                else:
+                    candidate_values = [
+                        str(example.get(script_args.dataset_prompt_column, ""))
+                    ]
+
+                entropy = compute_semantic_entropy(
+                    candidate_values,
+                    normalize_entropy=script_args.seed_entropy_normalize,
+                )
+                return {
+                    "seed_entropy_hint": entropy,
+                    "seed_modulation_hint": modulation_factor(
+                        entropy,
+                        script_args.seed_alpha,
+                        script_args.seed_entropy_modulation,
+                    ),
+                }
+
+            split_dataset = split_dataset.map(_add_seed_fields)
+
+            entropy_values = (
+                split_dataset["seed_entropy_hint"] if len(split_dataset) else []
+            )
+            modulation_values = (
+                split_dataset["seed_modulation_hint"] if len(split_dataset) else []
+            )
+            if entropy_values:
+                diagnostics[f"{split_name}_seed_entropy_mean"] = sum(
+                    entropy_values
+                ) / len(entropy_values)
+                diagnostics[f"{split_name}_seed_entropy_max"] = max(entropy_values)
+            if modulation_values:
+                diagnostics[f"{split_name}_seed_modulation_mean"] = sum(
+                    modulation_values
+                ) / len(modulation_values)
+
+            dataset[split_name] = split_dataset
+
+    return dataset, diagnostics
 
 
 def main(script_args, training_args, model_args):
@@ -59,6 +251,8 @@ def main(script_args, training_args, model_args):
     logger.info(f"Model parameters {model_args}")
     logger.info(f"Script parameters {script_args}")
     logger.info(f"Training parameters {training_args}")
+
+    apply_runtime_profile_overrides(script_args, training_args, model_args)
 
     # Check for last checkpoint
     last_checkpoint = None
@@ -106,6 +300,9 @@ def main(script_args, training_args, model_args):
         if "messages" in dataset[split].column_names:
             dataset[split] = dataset[split].remove_columns("messages")
 
+    dataset = limit_dataset_for_dry_run(dataset, script_args)
+    dataset, method_diagnostics = apply_method_features(dataset, script_args)
+
     #############################
     # Initialize the GRPO trainer
     #############################
@@ -114,11 +311,22 @@ def main(script_args, training_args, model_args):
         reward_funcs=reward_funcs,
         args=training_args,
         train_dataset=dataset[script_args.dataset_train_split],
-        eval_dataset=(dataset[script_args.dataset_test_split] if training_args.eval_strategy != "no" else None),
+        eval_dataset=(
+            dataset[script_args.dataset_test_split]
+            if training_args.eval_strategy != "no"
+            else None
+        ),
         peft_config=get_peft_config(model_args),
-        callbacks=get_callbacks(training_args, model_args),
+        callbacks=get_callbacks(training_args, model_args, script_args),
         processing_class=tokenizer,
     )
+
+    if is_local_dry_run(script_args) and script_args.dry_run_skip_train:
+        logger.info(
+            "Dry-run validation completed. Skipping trainer.train() by configuration."
+        )
+        write_dry_run_summary(script_args, training_args, dataset, method_diagnostics)
+        return
 
     ###############
     # Training loop
@@ -131,7 +339,11 @@ def main(script_args, training_args, model_args):
         checkpoint = last_checkpoint
     train_result = trainer.train(resume_from_checkpoint=checkpoint)
     metrics = train_result.metrics
+    metrics["method"] = script_args.method
     metrics["train_samples"] = len(dataset[script_args.dataset_train_split])
+    for key, value in method_diagnostics.items():
+        if isinstance(value, (int, float)):
+            metrics[f"method/{key}"] = value
     trainer.log_metrics("train", metrics)
     trainer.save_metrics("train", metrics)
     trainer.save_state()

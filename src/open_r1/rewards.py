@@ -19,6 +19,7 @@ import asyncio
 import json
 import math
 import re
+from dataclasses import dataclass
 from functools import partial, update_wrapper
 from typing import Callable, Dict, Literal, Optional
 
@@ -26,15 +27,38 @@ from latex2sympy2_extended import NormalizationConfig
 from math_verify import LatexExtractionConfig, parse, verify
 
 from .utils.code_providers import get_provider
-from .utils.competitive_programming import (
-    SubtaskResult,
-    add_includes,
-    get_morph_client_from_env,
-    get_piston_client_from_env,
-)
-from .utils.competitive_programming import patch_code as cf_patch_code
-from .utils.competitive_programming import score_submission as cf_score_submission
-from .utils.competitive_programming import score_subtask
+
+try:
+    from .utils.competitive_programming import (
+        SubtaskResult,
+        add_includes,
+        get_morph_client_from_env,
+        get_piston_client_from_env,
+    )
+    from .utils.competitive_programming import patch_code as cf_patch_code
+    from .utils.competitive_programming import score_submission as cf_score_submission
+    from .utils.competitive_programming import score_subtask
+
+    COMP_PROG_IMPORT_ERROR = None
+except Exception as exc:  # pragma: no cover - optional dependency path
+    COMP_PROG_IMPORT_ERROR = exc
+
+    @dataclass
+    class SubtaskResult:  # type: ignore[no-redef]
+        score: float = 0.0
+
+    def _missing_competitive_programming_dep(*_args, **_kwargs):
+        raise ImportError(
+            "Competitive programming dependencies are not installed. "
+            "Install open-r1 optional code-eval dependencies to use this reward."
+        ) from COMP_PROG_IMPORT_ERROR
+
+    add_includes = _missing_competitive_programming_dep  # type: ignore[assignment]
+    get_morph_client_from_env = _missing_competitive_programming_dep  # type: ignore[assignment]
+    get_piston_client_from_env = _missing_competitive_programming_dep  # type: ignore[assignment]
+    cf_patch_code = _missing_competitive_programming_dep  # type: ignore[assignment]
+    cf_score_submission = _missing_competitive_programming_dep  # type: ignore[assignment]
+    score_subtask = _missing_competitive_programming_dep  # type: ignore[assignment]
 
 
 def accuracy_reward(completions: list[list[dict[str, str]]], solution: list[str], **kwargs) -> list[Optional[float]]:
@@ -376,6 +400,11 @@ def ioi_code_reward(completions, test_batch_size: int = 1, provider_type: str = 
         provider_type: The execution provider to use (default: "piston"). Supported values: "piston", "morph"
         **kwargs: Additional arguments passed from the dataset
     """
+    if COMP_PROG_IMPORT_ERROR is not None:
+        raise ImportError(
+            "ioi_code reward requires optional competitive programming dependencies"
+        ) from COMP_PROG_IMPORT_ERROR
+
     # Get the appropriate client based on provider_type
     if provider_type == "morph":
         execution_client = get_morph_client_from_env()
@@ -430,6 +459,11 @@ def cf_code_reward(
 
     test_batch_size: evaluate these many test cases in parallel, then check if any of them failed (0 score): if so stop evaluating; otherwise continue with the next batch of test cases.
     """
+    if COMP_PROG_IMPORT_ERROR is not None:
+        raise ImportError(
+            "cf_code reward requires optional competitive programming dependencies"
+        ) from COMP_PROG_IMPORT_ERROR
+
     # for info on setting up piston workers, see slurm/piston/README.md
     piston_client = get_piston_client_from_env()
 

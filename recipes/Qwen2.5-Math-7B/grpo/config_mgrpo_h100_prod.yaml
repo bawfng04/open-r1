@@ -1,0 +1,56 @@
+# Production profile for MGRPO-style runs on H100.
+
+model_name_or_path: Qwen/Qwen2.5-Math-7B
+model_revision: main
+torch_dtype: bfloat16
+attn_implementation: flash_attention_2
+
+dataset_name: open-r1/OpenR1-Math-220k
+dataset_prompt_column: problem
+runtime_profile: h100-prod
+method: mgrpo
+mgrpo_num_layer2_generations: 8
+mgrpo_guiding_phrases:
+  - "Re-check the final answer carefully and correct any mistakes."
+  - "Try another reasoning path and compare with your first result."
+  - "Verify arithmetic and symbolic steps before giving the final answer."
+
+dry_run: false
+dry_run_skip_train: false
+dry_run_max_samples: 64
+
+bf16: true
+use_vllm: true
+do_eval: false
+gradient_accumulation_steps: 4
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+hub_model_id: Qwen2.5-Math-7B-Open-R1-MGRPO
+learning_rate: 2.0e-05
+logging_steps: 1
+logging_strategy: steps
+max_prompt_length: 512
+max_completion_length: 1024
+max_steps: -1
+num_generations: 16
+num_train_epochs: 1
+output_dir: data/Qwen2.5-Math-7B-Open-R1-MGRPO
+overwrite_output_dir: true
+per_device_eval_batch_size: 16
+per_device_train_batch_size: 16
+push_to_hub: false
+report_to:
+  - wandb
+reward_funcs:
+  - accuracy
+  - format
+  - tag_count
+reward_weights:
+  - 1.0
+  - 1.0
+  - 1.0
+save_strategy: "epoch"
+save_total_limit: 1
+seed: 42
+warmup_ratio: 0.1

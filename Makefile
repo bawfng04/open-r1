@@ -1,4 +1,4 @@
-.PHONY: style quality
+.PHONY: style quality local_env dryrun dryrun_mgrpo dryrun_seed benchmark_dryrun validate_datasets validate_server_ready
 
 # make sure to test the local checkout in scripts and not the pre-installed one (don't use quotes!)
 export PYTHONPATH = src
@@ -15,6 +15,10 @@ install:
 	uv pip install flash-attn --no-build-isolation && \
 	GIT_LFS_SKIP_SMUDGE=1 uv pip install -e ".[dev]"
 
+local_env:
+	python -m pip install --upgrade pip
+	python -m pip install accelerate trl transformers datasets pyyaml
+
 style:
 	ruff format --line-length 119 --target-version py310 $(check_dirs) setup.py
 	isort $(check_dirs) setup.py
@@ -26,6 +30,24 @@ quality:
 
 test:
 	pytest -sv --ignore=tests/slow/ tests/
+
+dryrun:
+	ACCELERATE_LOG_LEVEL=info python -m accelerate.commands.launch --config_file recipes/accelerate_configs/cpu.yaml src/open_r1/grpo.py --config recipes/Qwen2.5-Math-7B/grpo/config_local_dryrun.yaml
+
+dryrun_mgrpo:
+	ACCELERATE_LOG_LEVEL=info python -m accelerate.commands.launch --config_file recipes/accelerate_configs/cpu.yaml src/open_r1/grpo.py --config recipes/Qwen2.5-Math-7B/grpo/config_mgrpo_local_dryrun.yaml
+
+dryrun_seed:
+	ACCELERATE_LOG_LEVEL=info python -m accelerate.commands.launch --config_file recipes/accelerate_configs/cpu.yaml src/open_r1/grpo.py --config recipes/Qwen2.5-Math-7B/grpo/config_seed_local_dryrun.yaml
+
+benchmark_dryrun:
+	python scripts/run_benchmark_dryrun.py --offline-only
+
+validate_datasets:
+	python scripts/validate_datasets.py
+
+validate_server_ready:
+	python scripts/validate_server_ready.py
 
 slow_test:
 	pytest -sv -vv tests/slow/

@@ -1,0 +1,37 @@
+version: "1.0.0"
+generated: "2026-04-17"
+datasets:
+  - id: "math_500"
+    source: "lighteval"
+    hf_id: null
+    splits:
+      - name: "test"
+        size: 500
+    task_format: "cot"
+  - id: "gsm8k"
+    source: "huggingface"
+    hf_id: "openai/gsm8k"
+    config: "main"
+    splits:
+      - name: "train"
+        size: 7473
+      - name: "test"
+        size: 1319
+    task_format: "cot"
+  - id: "aime24"
+    source: "lighteval"
+    hf_id: null
+    splits:
+      - name: "test"
+        size: 30
+    task_format: "cot"
+  - id: "amc23"
+    source: "huggingface"
+    hf_id: "TianHongZXY/amc23"
+    splits:
+      - name: "test"
+        size: 25
+    task_format: "cot"
+metadata:
+  last_validated: "2026-04-17"
+  validation_script: "scripts/validate_datasets.py"

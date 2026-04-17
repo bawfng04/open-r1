@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import subprocess
+from copy import deepcopy
 from typing import List
 
 from transformers import TrainerCallback
@@ -77,16 +78,74 @@ class PushToHubRevisionCallback(TrainerCallback):
                 future.add_done_callback(run_benchmark_callback)
 
 
+class MethodMetricsCallback(TrainerCallback):
+    """Logs static method metadata for MGRPO/SEED runs."""
+
+    def __init__(self, script_args) -> None:
+        self.script_args = script_args
+        self.has_logged = False
+
+    def on_train_begin(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs,
+    ):
+        if self.has_logged or not state.is_world_process_zero:
+            return
+
+        method_name = getattr(self.script_args, "method", "vanilla")
+        payload = {
+            "method/name": method_name,
+            "method/runtime_profile": getattr(
+                self.script_args, "runtime_profile", "default"
+            ),
+        }
+
+        if method_name == "mgrpo":
+            payload["method/mgrpo_num_layer2_generations"] = getattr(
+                self.script_args,
+                "mgrpo_num_layer2_generations",
+                1,
+            )
+            payload["method/mgrpo_num_guiding_phrases"] = len(
+                getattr(self.script_args, "mgrpo_guiding_phrases", []) or []
+            )
+        elif method_name == "seed":
+            payload["method/seed_entropy_modulation"] = getattr(
+                self.script_args,
+                "seed_entropy_modulation",
+                "linear",
+            )
+            payload["method/seed_alpha"] = getattr(self.script_args, "seed_alpha", 1.0)
+
+        if "model" in kwargs and hasattr(kwargs["model"], "config"):
+            kwargs["model"].config.method_metadata = deepcopy(payload)
+
+        # We print once to keep a deterministic trace even when W&B is disabled.
+        print(f"[method-metadata] {payload}")
+        self.has_logged = True
+
+
 CALLBACKS = {
     "push_to_hub_revision": PushToHubRevisionCallback,
 }
 
 
-def get_callbacks(train_config, model_config) -> List[TrainerCallback]:
+def get_callbacks(
+    train_config, model_config, script_args=None
+) -> List[TrainerCallback]:
     callbacks = []
     for callback_name in train_config.callbacks:
         if callback_name not in CALLBACKS:
             raise ValueError(f"Callback {callback_name} not found in CALLBACKS.")
         callbacks.append(CALLBACKS[callback_name](model_config))
+
+    if (
+        script_args is not None
+        and getattr(script_args, "method", "vanilla") != "vanilla"
+    ):
+        callbacks.append(MethodMetricsCallback(script_args))
 
     return callbacks
