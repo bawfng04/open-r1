@@ -1,4 +1,4 @@
-.PHONY: style quality local_env dryrun dryrun_mgrpo dryrun_seed benchmark_dryrun validate_datasets validate_server_ready
+.PHONY: style quality local_env dryrun dryrun_mgrpo dryrun_seed benchmark_dryrun validate_datasets validate_server_ready prepare_requested_datasets
 
 # make sure to test the local checkout in scripts and not the pre-installed one (don't use quotes!)
 export PYTHONPATH = src
@@ -45,6 +45,9 @@ benchmark_dryrun:
 
 validate_datasets:
 	python scripts/validate_datasets.py
+
+prepare_requested_datasets:
+	python scripts/prepare_requested_datasets.py
 
 validate_server_ready:
 	python scripts/validate_server_ready.py

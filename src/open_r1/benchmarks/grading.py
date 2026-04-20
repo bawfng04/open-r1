@@ -70,8 +70,20 @@ def grade_prediction(predicted: str, reference: str, dataset_name: str) -> bool:
     pred = _normalize(predicted)
     ref = _normalize(reference)
 
+    aliases = {
+        "math_500": "math500",
+        "aime24": "aime2025",
+    }
+    canonical_dataset = aliases.get(dataset_name, dataset_name)
+
     math_equal = _try_import_ngrpo_math_equal()
-    if math_equal is not None and dataset_name in {"math_500", "gsm8k", "aime24", "amc23"}:
+    if math_equal is not None and canonical_dataset in {
+        "math500",
+        "gsm8k",
+        "aime2025",
+        "olympiadbench",
+        "amc23",
+    }:
         try:
             return bool(math_equal(pred, ref, timeout=False))
         except Exception:

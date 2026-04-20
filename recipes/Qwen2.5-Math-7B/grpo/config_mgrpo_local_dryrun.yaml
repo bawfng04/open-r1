@@ -5,7 +5,7 @@ model_revision: main
 torch_dtype: float32
 attn_implementation: eager
 
-dataset_name: open-r1/OpenR1-Math-220k
+dataset_name: data/datasets/requested
 dataset_prompt_column: problem
 runtime_profile: local-dryrun
 method: mgrpo

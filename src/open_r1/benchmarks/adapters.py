@@ -9,7 +9,23 @@ from typing import Iterable
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_DRYRUN_DATASETS = ("math_500", "gsm8k", "aime24", "amc23")
+SUPPORTED_DRYRUN_DATASETS = (
+    "math500",
+    "math_500",
+    "gsm8k",
+    "aime2025",
+    "aime24",
+    "olympiadbench",
+    "amc23",
+)
+
+
+def _canonical_name(dataset_name: str) -> str:
+    aliases = {
+        "math_500": "math500",
+        "aime24": "aime2025",
+    }
+    return aliases.get(dataset_name, dataset_name)
 
 
 @dataclass
@@ -20,8 +36,9 @@ class BenchmarkSample:
 
 
 def _synthetic_samples(dataset_name: str, max_questions: int) -> list[BenchmarkSample]:
+    dataset_name = _canonical_name(dataset_name)
     templates = {
-        "math_500": (
+        "math500": (
             "Solve: What is {a} + {b}?",
             lambda i: str(i + (i + 1)),
         ),
@@ -29,9 +46,13 @@ def _synthetic_samples(dataset_name: str, max_questions: int) -> list[BenchmarkS
             "A box has {a} apples and gets {b} more. How many apples now?",
             lambda i: str(i + (i + 2)),
         ),
-        "aime24": (
+        "aime2025": (
             "Compute the remainder when {a}^2 is divided by 10.",
             lambda i: str((i * i) % 10),
+        ),
+        "olympiadbench": (
+            "If x={a} and y={b}, compute x+y.",
+            lambda i: str(i + (i + 3)),
         ),
         "amc23": (
             "If x={a} and y={b}, compute x+y.",
@@ -43,7 +64,7 @@ def _synthetic_samples(dataset_name: str, max_questions: int) -> list[BenchmarkS
     samples: list[BenchmarkSample] = []
     for idx in range(max_questions):
         a = idx + 1
-        b = idx + 2 if dataset_name != "amc23" else idx + 3
+        b = idx + 2 if dataset_name not in {"amc23", "olympiadbench"} else idx + 3
         question = pattern.format(a=a, b=b)
         samples.append(
             BenchmarkSample(question_id=idx, question=question, answer=answer_fn(a))
@@ -56,8 +77,18 @@ def _try_load_hf_dataset(
     dataset_name: str, max_questions: int
 ) -> list[BenchmarkSample]:
     """Best-effort HF loading for dry-run. Falls back to synthetic on any error."""
+    dataset_name = _canonical_name(dataset_name)
     dataset_map = {
+        "math500": ("HuggingFaceH4/MATH-500", None, "test", "problem", "answer"),
         "gsm8k": ("openai/gsm8k", "main", "test", "question", "answer"),
+        "aime2025": ("TianHongZXY/AIME2025", None, "test", "problem", "answer"),
+        "olympiadbench": (
+            "Hothan/OlympiadBench",
+            "OE_TO_maths_en_COMP",
+            "train",
+            "question",
+            "final_answer",
+        ),
         "amc23": ("TianHongZXY/amc23", None, "test", "problem", "answer"),
     }
     if dataset_name not in dataset_map:

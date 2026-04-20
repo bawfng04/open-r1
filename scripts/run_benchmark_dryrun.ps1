@@ -1,5 +1,5 @@
 param(
-    [string]$Datasets = "math_500,gsm8k,aime24,amc23",
+    [string]$Datasets = "math500,gsm8k,aime2025,olympiadbench",
     [int]$NumQuestions = 16,
     [int]$NumGenerations = 8,
     [int]$Seed = 42,

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import os
 import sys
@@ -21,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run benchmark dry-run pipeline")
     parser.add_argument(
         "--datasets",
-        default="math_500,gsm8k,aime24,amc23",
+        default="math500,gsm8k,aime2025,olympiadbench",
         help="Comma-separated dataset list",
     )
     parser.add_argument(
@@ -55,7 +56,9 @@ def main() -> int:
     args = parse_args()
     _ensure_src_on_path()
 
-    from open_r1.benchmarks import run_benchmark_dryrun
+    run_benchmark_dryrun = importlib.import_module(
+        "open_r1.benchmarks"
+    ).run_benchmark_dryrun
 
     datasets = [item.strip() for item in args.datasets.split(",") if item.strip()]
     if not datasets:

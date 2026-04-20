@@ -5,7 +5,7 @@ model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
 
-dataset_name: open-r1/OpenR1-Math-220k
+dataset_name: data/datasets/requested
 dataset_prompt_column: problem
 runtime_profile: h100-prod
 method: seed
