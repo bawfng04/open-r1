@@ -5,6 +5,10 @@ MODEL_ID=""
 MODEL_REVISION="main"
 BENCHMARKS="math_500,aime24"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+cd "$REPO_ROOT"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --model-id)

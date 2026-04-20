@@ -4,6 +4,10 @@ set -euo pipefail
 CONFIG="recipes/Qwen2.5-Math-7B/grpo/config_h100_prod.yaml"
 CACHE_DIR="${HF_HOME:-$HOME/.cache/huggingface}"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+cd "$REPO_ROOT"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --config)
