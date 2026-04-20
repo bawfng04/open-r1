@@ -36,6 +36,37 @@ H100:
 - `recipes/Qwen2.5-Math-7B/grpo/config_seed_h100_prod.yaml`
 - `recipes/Qwen2.5-Math-7B/grpo/config_amsb_h100_prod.yaml`
 
+## 2.1) One-Click End-to-End Scripts (Detailed Progress Logs)
+
+Run from repo root `compare/open-r1`.
+
+Local full dry-run (Windows PowerShell):
+
+```powershell
+./scripts/run_all_local_dryrun.ps1
+```
+
+H100 full real run (Linux):
+
+```bash
+chmod +x ./scripts/run_all_h100_full.sh
+./scripts/run_all_h100_full.sh
+```
+
+Both scripts print timestamped step logs and save a detailed log file under:
+
+- `logs/pipeline-local-dryrun/` (Windows)
+- `logs/pipeline-h100/` (Linux)
+
+Useful options:
+
+- `--methods vanilla,mgrpo,seed,amsb`
+- `--continue-on-error`
+- `--skip-dataset-prepare`
+- `--skip-train`
+- `--skip-benchmark`
+- H100 only: `--disable-wandb`
+
 ## 3) Local Validation (Windows)
 
 Run from repo root `compare/open-r1`.

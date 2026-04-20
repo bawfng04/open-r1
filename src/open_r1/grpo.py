@@ -132,9 +132,14 @@ def write_dry_run_summary(
     logger.info(f"Wrote dry-run summary to {summary_path}")
 
 
-def apply_method_features(dataset, script_args: GRPOScriptArguments):
+def apply_method_features(
+    dataset,
+    script_args: GRPOScriptArguments,
+    base_seed: int = 0,
+):
     """Attach method-specific helper fields to the dataset for dry-run and logging."""
     method_name = script_args.method
+    base_seed = int(base_seed)
     diagnostics: dict[str, Any] = {"method": method_name}
 
     if method_name == "vanilla":
@@ -246,7 +251,7 @@ def apply_method_features(dataset, script_args: GRPOScriptArguments):
                     max_error_clusters=script_args.amsb_max_error_clusters,
                     entropy_scale_mode=script_args.amsb_entropy_scale_mode,
                     entropy_temperature=script_args.amsb_entropy_temperature,
-                    seed=script_args.seed + idx,
+                    seed=base_seed + idx,
                 )
 
                 return {
@@ -374,7 +379,11 @@ def main(script_args, training_args, model_args):
             dataset[split] = dataset[split].remove_columns("messages")
 
     dataset = limit_dataset_for_dry_run(dataset, script_args)
-    dataset, method_diagnostics = apply_method_features(dataset, script_args)
+    dataset, method_diagnostics = apply_method_features(
+        dataset,
+        script_args,
+        base_seed=training_args.seed,
+    )
 
     #############################
     # Initialize the GRPO trainer
