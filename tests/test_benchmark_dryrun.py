@@ -32,6 +32,23 @@ class TestBenchmarkDryRun(unittest.TestCase):
             data = json.loads(summary_path.read_text(encoding="utf-8"))
             self.assertEqual(data["runtime_profile"], "local-dryrun")
 
+    def test_run_benchmark_dryrun_amsb_method(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            summary = run_benchmark_dryrun(
+                datasets=["math500"],
+                num_questions=3,
+                num_generations=2,
+                output_dir=tmp_dir,
+                seed=7,
+                runtime_profile="local-dryrun",
+                method="amsb",
+                offline_only=True,
+            )
+
+            summary_path = Path(summary["summary_path"])
+            data = json.loads(summary_path.read_text(encoding="utf-8"))
+            self.assertEqual(data["method"], "amsb")
+
 
 if __name__ == "__main__":
     unittest.main()

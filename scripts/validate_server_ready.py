@@ -221,7 +221,7 @@ def validate_dataset_access(
     }
 
 
-def print_commands(local_cfg_path: Path, h100_cfg_path: Path):
+def print_commands(local_cfg_path: Path, h100_cfg_path: Path, method_name: str):
     commands = {
         "local_dryrun": (
             "python -m accelerate.commands.launch --config_file recipes/accelerate_configs/cpu.yaml "
@@ -230,7 +230,7 @@ def print_commands(local_cfg_path: Path, h100_cfg_path: Path):
         "benchmark_dryrun": (
             "python scripts/run_benchmark_dryrun.py "
             "--datasets math500,gsm8k,aime2025,olympiadbench "
-            "--runtime-profile local-dryrun --method vanilla"
+            f"--runtime-profile local-dryrun --method {method_name}"
         ),
         "validate_datasets": "python scripts/validate_datasets.py",
         "h100_prod": (
@@ -346,7 +346,10 @@ def main() -> int:
 
     print("Server readiness profile validation passed.")
     if local_path is not None:
-        print_commands(local_path, h100_path)
+        local_method = (
+            local_cfg.get("method", "vanilla") if "local_cfg" in locals() else "vanilla"
+        )
+        print_commands(local_path, h100_path, method_name=str(local_method))
     if args.print_json:
         print(json.dumps(report, indent=2))
     return 0

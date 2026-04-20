@@ -1,0 +1,56 @@
+# Production profile for A-MSB-GRPO runs on H100.
+
+model_name_or_path: Qwen/Qwen2.5-Math-7B
+model_revision: main
+torch_dtype: bfloat16
+attn_implementation: flash_attention_2
+
+dataset_name: data/datasets/requested
+dataset_prompt_column: problem
+runtime_profile: h100-prod
+method: amsb
+amsb_balanced_group_size: 16
+amsb_max_error_clusters: 2
+amsb_entropy_scale_mode: exp_decay
+amsb_entropy_temperature: 1.0
+amsb_reflection_prompt: "Review the reasoning carefully. Keep the answer unchanged if it is already correct, otherwise provide a corrected solution."
+
+dry_run: false
+dry_run_skip_train: false
+dry_run_max_samples: 64
+
+bf16: true
+use_vllm: true
+do_eval: false
+gradient_accumulation_steps: 4
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+hub_model_id: Qwen2.5-Math-7B-Open-R1-AMSB
+learning_rate: 2.0e-05
+logging_steps: 1
+logging_strategy: steps
+max_prompt_length: 512
+max_completion_length: 1024
+max_steps: -1
+num_generations: 16
+num_train_epochs: 1
+output_dir: data/Qwen2.5-Math-7B-Open-R1-AMSB
+overwrite_output_dir: true
+per_device_eval_batch_size: 16
+per_device_train_batch_size: 16
+push_to_hub: false
+report_to:
+  - wandb
+reward_funcs:
+  - accuracy
+  - format
+  - tag_count
+reward_weights:
+  - 1.0
+  - 1.0
+  - 1.0
+save_strategy: "epoch"
+save_total_limit: 1
+seed: 42
+warmup_ratio: 0.1

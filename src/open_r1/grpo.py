@@ -26,6 +26,7 @@ from transformers.trainer_utils import get_last_checkpoint
 
 from open_r1.configs import GRPOConfig, GRPOScriptArguments
 from open_r1.methods import (
+    build_amsb_plan,
     build_mgrpo_layer2_prompt,
     compute_mgrpo_transition_metrics,
     compute_semantic_entropy,
@@ -220,6 +221,78 @@ def apply_method_features(dataset, script_args: GRPOScriptArguments):
                 ) / len(modulation_values)
 
             dataset[split_name] = split_dataset
+
+        if method_name == "amsb":
+
+            def _add_amsb_fields(example, idx):
+                candidates = example.get("amsb_candidate_completions", None)
+                if isinstance(candidates, list) and candidates:
+                    candidate_values = [str(value) for value in candidates]
+                else:
+                    candidate_values = [
+                        str(example.get(script_args.dataset_prompt_column, ""))
+                    ]
+
+                candidate_labels = example.get("amsb_candidate_labels", None)
+                if isinstance(candidate_labels, list):
+                    bool_labels = [bool(value) for value in candidate_labels]
+                else:
+                    bool_labels = None
+
+                plan = build_amsb_plan(
+                    candidate_completions=candidate_values,
+                    candidate_correctness=bool_labels,
+                    balanced_group_size=script_args.amsb_balanced_group_size,
+                    max_error_clusters=script_args.amsb_max_error_clusters,
+                    entropy_scale_mode=script_args.amsb_entropy_scale_mode,
+                    entropy_temperature=script_args.amsb_entropy_temperature,
+                    seed=script_args.seed + idx,
+                )
+
+                return {
+                    "amsb_reflection_prompt": script_args.amsb_reflection_prompt,
+                    "amsb_entropy_hint": plan["entropy"],
+                    "amsb_scale_hint": plan["scale"],
+                    "amsb_correct_pool_size": plan["correct_pool_size"],
+                    "amsb_error_pool_size": plan["error_pool_size"],
+                    "amsb_error_cluster_count": plan["error_cluster_count"],
+                    "amsb_top_error_cluster_count": plan["top_error_cluster_count"],
+                    "amsb_balanced_group_size": plan["balanced_group_size"],
+                }
+
+            split_dataset = split_dataset.map(_add_amsb_fields, with_indices=True)
+
+            entropy_values = (
+                split_dataset["amsb_entropy_hint"] if len(split_dataset) else []
+            )
+            scale_values = (
+                split_dataset["amsb_scale_hint"] if len(split_dataset) else []
+            )
+            top_cluster_values = (
+                split_dataset["amsb_top_error_cluster_count"]
+                if len(split_dataset)
+                else []
+            )
+            if entropy_values:
+                diagnostics[f"{split_name}_amsb_entropy_mean"] = sum(
+                    entropy_values
+                ) / len(entropy_values)
+                diagnostics[f"{split_name}_amsb_entropy_max"] = max(entropy_values)
+            if scale_values:
+                diagnostics[f"{split_name}_amsb_scale_mean"] = sum(scale_values) / len(
+                    scale_values
+                )
+                diagnostics[f"{split_name}_amsb_scale_min"] = min(scale_values)
+            if top_cluster_values:
+                diagnostics[f"{split_name}_amsb_top_error_clusters_mean"] = sum(
+                    top_cluster_values
+                ) / len(top_cluster_values)
+
+            diagnostics[f"{split_name}_amsb_balanced_group_size"] = (
+                script_args.amsb_balanced_group_size
+            )
+            dataset[split_name] = split_dataset
+            continue
 
     return dataset, diagnostics
 

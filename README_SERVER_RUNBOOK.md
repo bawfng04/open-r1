@@ -17,7 +17,8 @@ The requested dataset bundle is expected at:
 1. `vanilla` GRPO train pipeline
 2. `mgrpo` GRPO train pipeline
 3. `seed` GRPO train pipeline
-4. benchmark dry-run pipeline on `math500,gsm8k,aime2025,olympiadbench`
+4. `amsb` GRPO train pipeline
+5. benchmark dry-run pipeline on `math500,gsm8k,aime2025,olympiadbench`
 
 ## 2) Config Files
 
@@ -26,12 +27,14 @@ Local dry-run:
 - `recipes/Qwen2.5-Math-7B/grpo/config_local_dryrun.yaml`
 - `recipes/Qwen2.5-Math-7B/grpo/config_mgrpo_local_dryrun.yaml`
 - `recipes/Qwen2.5-Math-7B/grpo/config_seed_local_dryrun.yaml`
+- `recipes/Qwen2.5-Math-7B/grpo/config_amsb_local_dryrun.yaml`
 
 H100:
 
 - `recipes/Qwen2.5-Math-7B/grpo/config_h100_prod.yaml`
 - `recipes/Qwen2.5-Math-7B/grpo/config_mgrpo_h100_prod.yaml`
 - `recipes/Qwen2.5-Math-7B/grpo/config_seed_h100_prod.yaml`
+- `recipes/Qwen2.5-Math-7B/grpo/config_amsb_h100_prod.yaml`
 
 ## 3) Local Validation (Windows)
 
@@ -49,14 +52,16 @@ python scripts/prepare_requested_datasets.py
 python scripts/validate_server_ready.py --h100-config recipes/Qwen2.5-Math-7B/grpo/config_h100_prod.yaml --strict-dataset --print-json
 python scripts/validate_server_ready.py --h100-config recipes/Qwen2.5-Math-7B/grpo/config_mgrpo_h100_prod.yaml --strict-dataset --print-json
 python scripts/validate_server_ready.py --h100-config recipes/Qwen2.5-Math-7B/grpo/config_seed_h100_prod.yaml --strict-dataset --print-json
+python scripts/validate_server_ready.py --h100-config recipes/Qwen2.5-Math-7B/grpo/config_amsb_h100_prod.yaml --strict-dataset --print-json
 ```
 
-### 3.3 Run local smoke tests (3 train pipelines)
+### 3.3 Run local smoke tests (4 train pipelines)
 
 ```powershell
 ./scripts/run_local_dryrun.ps1 -RecipeConfig recipes/Qwen2.5-Math-7B/grpo/config_local_dryrun.yaml
 ./scripts/run_local_dryrun.ps1 -RecipeConfig recipes/Qwen2.5-Math-7B/grpo/config_mgrpo_local_dryrun.yaml
 ./scripts/run_local_dryrun.ps1 -RecipeConfig recipes/Qwen2.5-Math-7B/grpo/config_seed_local_dryrun.yaml
+./scripts/run_local_dryrun.ps1 -RecipeConfig recipes/Qwen2.5-Math-7B/grpo/config_amsb_local_dryrun.yaml
 ```
 
 Expected outputs:
@@ -64,6 +69,13 @@ Expected outputs:
 - `data/Qwen2.5-Math-7B-Open-R1-GRPO-DryRun/dry_run_summary.json`
 - `data/Qwen2.5-Math-7B-Open-R1-MGRPO-DryRun/dry_run_summary.json`
 - `data/Qwen2.5-Math-7B-Open-R1-SEED-DryRun/dry_run_summary.json`
+- `data/Qwen2.5-Math-7B-Open-R1-AMSB-DryRun/dry_run_summary.json`
+
+Alternative one-command local flow for A-MSB-GRPO:
+
+```powershell
+./scripts/run_amsb_local_pipeline.ps1 -OfflineOnly
+```
 
 ### 3.4 Run benchmark dry-run (4th pipeline)
 
@@ -102,6 +114,7 @@ source .venv/bin/activate
 ./scripts/bootstrap/verify-setup.sh --config recipes/Qwen2.5-Math-7B/grpo/config_h100_prod.yaml
 ./scripts/bootstrap/verify-setup.sh --config recipes/Qwen2.5-Math-7B/grpo/config_mgrpo_h100_prod.yaml
 ./scripts/bootstrap/verify-setup.sh --config recipes/Qwen2.5-Math-7B/grpo/config_seed_h100_prod.yaml
+./scripts/bootstrap/verify-setup.sh --config recipes/Qwen2.5-Math-7B/grpo/config_amsb_h100_prod.yaml
 ```
 
 Optional direct preflight report:
@@ -110,12 +123,13 @@ Optional direct preflight report:
 python scripts/validate_server_ready.py --h100-config recipes/Qwen2.5-Math-7B/grpo/config_h100_prod.yaml --accelerate-config recipes/accelerate_configs/zero3.yaml --check-deps --check-gpu --strict-dataset --print-json
 ```
 
-### 5.3 Start training (3 train pipelines)
+### 5.3 Start training (4 train pipelines)
 
 ```bash
 ./scripts/deploy/train-grpo.sh --config recipes/Qwen2.5-Math-7B/grpo/config_h100_prod.yaml
 ./scripts/deploy/train-grpo.sh --config recipes/Qwen2.5-Math-7B/grpo/config_mgrpo_h100_prod.yaml
 ./scripts/deploy/train-grpo.sh --config recipes/Qwen2.5-Math-7B/grpo/config_seed_h100_prod.yaml
+./scripts/deploy/train-grpo.sh --config recipes/Qwen2.5-Math-7B/grpo/config_amsb_h100_prod.yaml
 ```
 
 Each command runs strict preflight before `accelerate launch`.
@@ -126,6 +140,7 @@ Each command runs strict preflight before `accelerate launch`.
 python scripts/run_benchmark_dryrun.py --datasets math500,gsm8k,aime2025,olympiadbench --num-questions 64 --num-generations 8 --runtime-profile h100-prod --method vanilla --output-dir data/benchmark-h100-vanilla
 python scripts/run_benchmark_dryrun.py --datasets math500,gsm8k,aime2025,olympiadbench --num-questions 64 --num-generations 8 --runtime-profile h100-prod --method mgrpo --output-dir data/benchmark-h100-mgrpo
 python scripts/run_benchmark_dryrun.py --datasets math500,gsm8k,aime2025,olympiadbench --num-questions 64 --num-generations 8 --runtime-profile h100-prod --method seed --output-dir data/benchmark-h100-seed
+python scripts/run_benchmark_dryrun.py --datasets math500,gsm8k,aime2025,olympiadbench --num-questions 64 --num-generations 8 --runtime-profile h100-prod --method amsb --output-dir data/benchmark-h100-amsb
 ```
 
 ## 7) Common Errors and Fixes
@@ -203,8 +218,8 @@ python scripts/validate_server_ready.py --h100-config recipes/Qwen2.5-Math-7B/gr
 ## 8) Quick Go/No-Go Checklist
 
 - [ ] requested datasets exist in `data/datasets/requested/...`
-- [ ] `validate_server_ready.py --strict-dataset` passes for all 3 H100 configs
-- [ ] local dry-run summaries exist for vanilla/mgrpo/seed
+- [ ] `validate_server_ready.py --strict-dataset` passes for all 4 H100 configs
+- [ ] local dry-run summaries exist for vanilla/mgrpo/seed/amsb
 - [ ] H100 preflight with `--check-deps --check-gpu` passes
 - [ ] train commands launch without preflight failure
 - [ ] benchmark summaries are generated per method

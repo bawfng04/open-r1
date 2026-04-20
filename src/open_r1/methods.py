@@ -18,9 +18,10 @@
 from __future__ import annotations
 
 import math
+import random
 import re
 from collections import defaultdict
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 
 ANSWER_TAG_PATTERN = re.compile(r"<answer>\s*(.*?)\s*</answer>", re.DOTALL | re.IGNORECASE)
@@ -161,4 +162,132 @@ def compute_mgrpo_transition_metrics(
         "acc_t2": t2_hits / total,
         "delta_i_to_c": i_to_c / total,
         "delta_c_to_i": c_to_i / total,
+    }
+
+
+def select_top_error_clusters(
+    error_answers: Sequence[str],
+    max_clusters: int,
+) -> list[list[int]]:
+    """Return indices for the largest semantic error clusters."""
+    if max_clusters < 1:
+        raise ValueError("max_clusters must be >= 1")
+
+    clusters = cluster_answers(error_answers)
+    ranked = sorted(clusters.items(), key=lambda item: (-len(item[1]), item[0]))
+    return [indices for _, indices in ranked[:max_clusters]]
+
+
+def sample_balanced_indices(
+    correct_indices: Sequence[int],
+    top_error_clusters: Sequence[Sequence[int]],
+    group_size: int,
+    seed: int,
+) -> dict[str, list[int]]:
+    """Sample a static 50/50 correct-vs-error index group with replacement."""
+    if group_size < 2:
+        raise ValueError("group_size must be >= 2")
+    if group_size % 2 != 0:
+        raise ValueError("group_size must be even for 50/50 balancing")
+
+    rng = random.Random(seed)
+    correct_pool = list(correct_indices)
+    error_pool = [idx for cluster in top_error_clusters for idx in cluster]
+
+    if not correct_pool:
+        correct_pool = error_pool[:] if error_pool else [0]
+    if not error_pool:
+        error_pool = correct_pool[:]
+
+    half = group_size // 2
+    selected_correct = rng.choices(correct_pool, k=half)
+    selected_error = rng.choices(error_pool, k=half)
+    return {
+        "correct": selected_correct,
+        "error": selected_error,
+        "all": selected_correct + selected_error,
+    }
+
+
+def entropy_scale_factor(entropy: float, mode: str, temperature: float) -> float:
+    """Convert entropy to a continuous loss scale used by A-MSB-GRPO."""
+    if temperature <= 0:
+        raise ValueError("temperature must be > 0")
+
+    normalized_entropy = max(entropy, 0.0) / temperature
+    if mode == "exp_decay":
+        scale = math.exp(-normalized_entropy)
+    elif mode == "inverse":
+        scale = 1.0 / (1.0 + normalized_entropy)
+    elif mode == "linear":
+        scale = max(0.0, 1.0 - normalized_entropy)
+    else:
+        raise ValueError(f"Unknown entropy scale mode: {mode}")
+
+    return float(max(scale, 1e-6))
+
+
+def build_amsb_plan(
+    candidate_completions: Sequence[str],
+    candidate_correctness: Sequence[bool] | None,
+    balanced_group_size: int,
+    max_error_clusters: int,
+    entropy_scale_mode: str,
+    entropy_temperature: float,
+    seed: int,
+) -> dict[str, Any]:
+    """Build A-MSB diagnostics from candidate completions."""
+    completions = [str(value) for value in candidate_completions] or [""]
+
+    correctness: list[bool] | None = None
+    if candidate_correctness is not None and len(candidate_correctness) == len(
+        completions
+    ):
+        correctness = [bool(value) for value in candidate_correctness]
+
+    if correctness is None:
+        correct_indices: list[int] = []
+        error_indices = list(range(len(completions)))
+    else:
+        correct_indices = [idx for idx, value in enumerate(correctness) if value]
+        error_indices = [idx for idx, value in enumerate(correctness) if not value]
+
+    if not error_indices:
+        error_indices = list(range(len(completions)))
+
+    error_answers = [completions[idx] for idx in error_indices]
+    all_error_clusters = cluster_answers(error_answers)
+    top_error_clusters_relative = select_top_error_clusters(
+        error_answers,
+        max_clusters=max_error_clusters,
+    )
+    top_error_clusters = [
+        [error_indices[inner_idx] for inner_idx in cluster]
+        for cluster in top_error_clusters_relative
+    ]
+
+    sampled_group = sample_balanced_indices(
+        correct_indices=correct_indices,
+        top_error_clusters=top_error_clusters,
+        group_size=balanced_group_size,
+        seed=seed,
+    )
+
+    entropy = compute_semantic_entropy(error_answers, normalize_entropy=True)
+    scale = entropy_scale_factor(
+        entropy,
+        mode=entropy_scale_mode,
+        temperature=entropy_temperature,
+    )
+
+    return {
+        "entropy": entropy,
+        "scale": scale,
+        "correct_pool_size": len(correct_indices),
+        "error_pool_size": len(error_indices),
+        "error_cluster_count": len(all_error_clusters),
+        "top_error_cluster_count": len(top_error_clusters),
+        "balanced_group_size": balanced_group_size,
+        "balanced_correct_count": len(sampled_group["correct"]),
+        "balanced_error_count": len(sampled_group["error"]),
     }

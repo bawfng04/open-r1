@@ -329,11 +329,11 @@ class GRPOScriptArguments(ScriptArguments):
         default=4096,
         metadata={"help": "Minimum number of characters in completion."},
     )
-    method: Literal["vanilla", "mgrpo", "seed"] = field(
+    method: Literal["vanilla", "mgrpo", "seed", "amsb"] = field(
         default="vanilla",
         metadata={
             "help": "GRPO variant selector.",
-            "choices": ["vanilla", "mgrpo", "seed"],
+            "choices": ["vanilla", "mgrpo", "seed", "amsb"],
         },
     )
     mgrpo_num_layer2_generations: int = field(
@@ -367,6 +367,40 @@ class GRPOScriptArguments(ScriptArguments):
         default=True,
         metadata={
             "help": "Normalize semantic entropy by log(K) where K is the number of unique clusters."
+        },
+    )
+    amsb_balanced_group_size: int = field(
+        default=16,
+        metadata={
+            "help": "Static 50/50 balanced group size used by A-MSB-GRPO.",
+        },
+    )
+    amsb_max_error_clusters: int = field(
+        default=2,
+        metadata={
+            "help": "Maximum number of top semantic error clusters used in A-MSB-GRPO.",
+        },
+    )
+    amsb_entropy_scale_mode: Literal["exp_decay", "inverse", "linear"] = field(
+        default="exp_decay",
+        metadata={
+            "help": "Entropy-to-loss scaling rule in A-MSB-GRPO.",
+            "choices": ["exp_decay", "inverse", "linear"],
+        },
+    )
+    amsb_entropy_temperature: float = field(
+        default=1.0,
+        metadata={
+            "help": "Temperature for entropy scaling in A-MSB-GRPO.",
+        },
+    )
+    amsb_reflection_prompt: str = field(
+        default=(
+            "Review the reasoning carefully. Keep the answer unchanged if it is already correct, "
+            "otherwise provide a corrected solution."
+        ),
+        metadata={
+            "help": "Neutral reflection prompt used by A-MSB-GRPO layer-2 correction.",
         },
     )
     runtime_profile: Literal["default", "local-dryrun", "h100-prod"] = field(
@@ -404,10 +438,23 @@ class GRPOScriptArguments(ScriptArguments):
         if self.seed_alpha <= 0:
             raise ValueError("`seed_alpha` must be > 0")
 
+        if self.amsb_entropy_temperature <= 0:
+            raise ValueError("`amsb_entropy_temperature` must be > 0")
+
         if self.method == "mgrpo" and not self.mgrpo_guiding_phrases:
             raise ValueError(
                 "`mgrpo_guiding_phrases` must contain at least one phrase in MGRPO mode"
             )
+
+        if self.method == "amsb":
+            if self.amsb_balanced_group_size < 2:
+                raise ValueError("`amsb_balanced_group_size` must be >= 2")
+            if self.amsb_balanced_group_size % 2 != 0:
+                raise ValueError(
+                    "`amsb_balanced_group_size` must be even for 50/50 balancing"
+                )
+            if self.amsb_max_error_clusters < 1:
+                raise ValueError("`amsb_max_error_clusters` must be >= 1")
 
         if self.runtime_profile == "local-dryrun":
             self.dry_run = True
