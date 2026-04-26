@@ -35,7 +35,7 @@ max_prompt_length: 2048
 max_completion_length: 1024
 max_steps: -1
 num_generations: 8
-num_train_epochs: 2
+num_train_epochs: 1
 output_dir: data/Qwen2.5-Math-7B-Open-R1-SEED
 overwrite_output_dir: true
 per_device_eval_batch_size: 16

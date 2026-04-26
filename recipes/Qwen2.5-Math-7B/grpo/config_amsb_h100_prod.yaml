@@ -1,9 +1,11 @@
 # Production profile for A-MSB-GRPO runs on H100.
 
-model_name_or_path: Qwen/Qwen2.5-Math-7B
+model_name_or_path: Qwen/Qwen2.5-7B-Instruct
 model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
+use_peft: true
+load_in_4bit: true
 
 dataset_name: data/datasets/requested
 dataset_prompt_column: problem
@@ -21,24 +23,25 @@ dry_run_max_samples: 64
 
 bf16: true
 use_vllm: true
+vllm_gpu_memory_utilization: 0.3
 do_eval: false
-gradient_accumulation_steps: 4
+gradient_accumulation_steps: 8
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:
   use_reentrant: false
 hub_model_id: Qwen2.5-Math-7B-Open-R1-AMSB
-learning_rate: 2.0e-05
+learning_rate: 1.0e-05
 logging_steps: 1
 logging_strategy: steps
-max_prompt_length: 512
+max_prompt_length: 2048
 max_completion_length: 1024
 max_steps: -1
-num_generations: 16
+num_generations: 8
 num_train_epochs: 1
 output_dir: data/Qwen2.5-Math-7B-Open-R1-AMSB
 overwrite_output_dir: true
 per_device_eval_batch_size: 16
-per_device_train_batch_size: 16
+per_device_train_batch_size: 2
 push_to_hub: false
 report_to:
   - wandb
