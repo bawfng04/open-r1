@@ -6,7 +6,7 @@ model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
 use_peft: true
-load_in_4bit: true
+load_in_4bit: false
 
 # Data training arguments
 dataset_name: data/datasets/requested
@@ -21,6 +21,7 @@ dry_run_max_samples: 64
 # GRPO trainer config (H100)
 bf16: true
 use_vllm: true
+vllm_mode: colocate
 vllm_gpu_memory_utilization: 0.3
 do_eval: false
 gradient_accumulation_steps: 8

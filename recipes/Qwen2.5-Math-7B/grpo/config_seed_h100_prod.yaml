@@ -5,10 +5,11 @@ model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
 use_peft: true
-load_in_4bit: true
+load_in_4bit: false
 
 dataset_name: data/datasets/requested
 dataset_prompt_column: problem
+system_prompt: "You are a helpful AI Assistant that provides well-reasoned and detailed responses. You first think about the reasoning process as an internal monologue and then provide the user with the answer. Respond in the following format: <think>\n...\n</think>\n<answer>\n...\n</answer>"
 runtime_profile: h100-prod
 method: seed
 seed_entropy_modulation: linear
@@ -21,6 +22,7 @@ dry_run_max_samples: 64
 
 bf16: true
 use_vllm: true
+vllm_mode: colocate
 vllm_gpu_memory_utilization: 0.3
 do_eval: false
 gradient_accumulation_steps: 8

@@ -6,7 +6,7 @@ DATASETS="math500,gsm8k,aime2025,olympiadbench"
 NUM_QUESTIONS=64
 NUM_GENERATIONS=8
 SEED=42
-ACCELERATE_CONFIG="recipes/accelerate_configs/zero3_1gpu.yaml"
+ACCELERATE_CONFIG="recipes/accelerate_configs/zero2_1gpu.yaml"
 VENV_PATH=".venv"
 LOG_DIR="logs/pipeline-h100"
 
