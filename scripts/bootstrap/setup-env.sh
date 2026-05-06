@@ -34,7 +34,10 @@ fi
 source "$VENV_PATH/bin/activate"
 python -m pip install --upgrade pip
 python -m pip install -e ".[$INSTALL_EXTRAS]"
-python -m pip install accelerate trl transformers datasets pyyaml
+# IMPORTANT:
+# Keep core dependency versions pinned by setup.py / extras.
+# Installing unpinned accelerate/trl/transformers/datasets here will drift the environment.
+python -m pip install pyyaml
 
 if [[ "$INSTALL_H100_EXTRAS" == "true" ]]; then
   python -m pip install vllm==0.8.5.post1
