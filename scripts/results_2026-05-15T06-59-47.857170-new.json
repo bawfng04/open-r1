@@ -1,0 +1,117 @@
+{
+    "config_general": {
+        "lighteval_sha": "?",
+        "num_fewshot_seeds": 1,
+        "max_samples": 10,
+        "job_id": 0,
+        "start_time": 1549383.265259635,
+        "end_time": 1549658.166725875,
+        "total_evaluation_time_secondes": "274.90146624017507",
+        "model_name": "models_SB-GRPO-English",
+        "model_sha": "",
+        "model_dtype": null,
+        "model_size": null,
+        "generation_parameters": {
+            "early_stopping": null,
+            "repetition_penalty": null,
+            "frequency_penalty": null,
+            "length_penalty": null,
+            "presence_penalty": null,
+            "max_new_tokens": null,
+            "min_new_tokens": null,
+            "seed": null,
+            "stop_tokens": null,
+            "temperature": null,
+            "top_k": null,
+            "min_p": null,
+            "top_p": null,
+            "truncate_prompt": null,
+            "response_format": null
+        }
+    },
+    "results": {
+        "lighteval|gsm8k|0": {
+            "extractive_match": 0.6,
+            "extractive_match_stderr": 0.16329931618554522
+        },
+        "all": {
+            "extractive_match": 0.6,
+            "extractive_match_stderr": 0.16329931618554522
+        }
+    },
+    "versions": {
+        "lighteval|gsm8k|0": 0
+    },
+    "config_tasks": {
+        "lighteval|gsm8k": {
+            "name": "gsm8k",
+            "prompt_function": "gsm8k",
+            "hf_repo": "gsm8k",
+            "hf_subset": "main",
+            "metric": [
+                {
+                    "metric_name": "extractive_match",
+                    "higher_is_better": true,
+                    "category": "3",
+                    "use_case": "1",
+                    "sample_level_fn": "sample_level_fn",
+                    "corpus_level_fn": "mean"
+                }
+            ],
+            "hf_revision": null,
+            "hf_filter": null,
+            "hf_avail_splits": [
+                "train",
+                "test"
+            ],
+            "trust_dataset": true,
+            "evaluation_splits": [
+                "test"
+            ],
+            "few_shots_split": null,
+            "few_shots_select": "random_sampling_from_train",
+            "generation_size": 16384,
+            "generation_grammar": null,
+            "stop_sequence": [
+                "Question:"
+            ],
+            "num_samples": null,
+            "suite": [
+                "lighteval"
+            ],
+            "original_num_docs": 1319,
+            "effective_num_docs": 10,
+            "must_remove_duplicate_docs": false,
+            "version": 0
+        }
+    },
+    "summary_tasks": {
+        "lighteval|gsm8k|0": {
+            "hashes": {
+                "hash_examples": "34eb3ecbbd9b0f5b",
+                "hash_full_prompts": "eb932780a8a73833",
+                "hash_input_tokens": "f5cc5a312039081b",
+                "hash_cont_tokens": "0848ad4935dec03d"
+            },
+            "truncated": 0,
+            "non_truncated": 10,
+            "padded": 0,
+            "non_padded": 10,
+            "effective_few_shots": 0.0,
+            "num_truncated_few_shots": 0
+        }
+    },
+    "summary_general": {
+        "hashes": {
+            "hash_examples": "c65776f786de579a",
+            "hash_full_prompts": "56bef30446bc1ca3",
+            "hash_input_tokens": "73084919ba6fed07",
+            "hash_cont_tokens": "d65c40c9b84ae237"
+        },
+        "truncated": 0,
+        "non_truncated": 10,
+        "padded": 0,
+        "non_padded": 10,
+        "num_truncated_few_shots": 0
+    }
+}
